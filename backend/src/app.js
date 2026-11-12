@@ -10,6 +10,8 @@ import walletRoutes from './routes/wallet.routes.js';
 import webhookRoutes from './routes/webhook.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import orgRoutes from './routes/org.routes.js';
+// Isolated test feature — Claude-driven Hindi voice chat (not part of Vapi).
+import claudeVoiceRoutes from './routes/claudeVoice.routes.js';
 
 const app = express();
 
@@ -44,6 +46,7 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/org', orgRoutes);
+app.use('/api/claude-voice', claudeVoiceRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

@@ -9,6 +9,10 @@ import CallLogs from './pages/CallLogs.jsx';
 import Billing from './pages/Billing.jsx';
 import Users from './pages/Users.jsx';
 import Settings from './pages/Settings.jsx';
+// Isolated test feature — Claude-driven Hindi voice chat, gated by a flag.
+import ClaudeVoiceTest from './features/claude-voice/ClaudeVoiceTest.jsx';
+
+const CLAUDE_VOICE_ENABLED = import.meta.env.VITE_ENABLE_CLAUDE_VOICE === 'true';
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -23,6 +27,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+      {/* Standalone, no-auth test route for the Claude voice feature. */}
+      {CLAUDE_VOICE_ENABLED && <Route path="/voice-test" element={<ClaudeVoiceTest />} />}
       <Route
         path="/"
         element={
