@@ -18,6 +18,20 @@ function toCsvCell(value) {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
+/** Generic CSV download: headers (array) + rows (array of arrays) -> file. */
+export function downloadCsv(filename, headers, rows) {
+  const csv = [headers, ...rows].map((r) => r.map(toCsvCell).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }); // BOM = Excel-friendly
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 /** Build the CSV text (headers + demo rows, or headers only). */
 export function buildTemplateCsv({ includeDemo = true } = {}) {
   const rows = [TEMPLATE_HEADERS, ...(includeDemo ? DEMO_ROWS : [])];

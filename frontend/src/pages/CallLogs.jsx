@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client.js';
 import { Badge, Icon, Spinner } from '../components/ui.jsx';
 import CallDetailModal from '../components/CallDetailModal.jsx';
+import { downloadCsv } from '../utils/csvTemplate.js';
 import {
-  fmtInt, fmtDuration, fmtTime, statusTone, outcomeTone,
+  fmtInt, fmtDuration, fmtTime, fmtDateTime, statusTone, outcomeTone,
   STATUS_LABEL, OUTCOME_LABEL,
 } from '../utils/format.js';
 
@@ -29,11 +30,34 @@ export default function CallLogs() {
   const setFilter = (k, v) => { setFilters((f) => ({ ...f, [k]: v })); setPage(1); };
   const pages = Math.ceil(total / limit) || 1;
 
+  const [exporting, setExporting] = useState(false);
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const qs = new URLSearchParams();
+      Object.entries(filters).forEach(([k, v]) => v && qs.append(k, v));
+      const { calls: all } = await api.get(`/calls/export?${qs}`);
+      const headers = ['Patient', 'Phone', 'Campaign', 'Status', 'Outcome', 'Duration (sec)', 'Billed minutes', 'Date'];
+      const rows = all.map((c) => [
+        c.patientName, c.phoneNumber, c.campaignId?.name || '',
+        STATUS_LABEL[c.status], OUTCOME_LABEL[c.outcome],
+        c.durationSeconds || 0, c.billedMinutes || 0, fmtDateTime(c.createdAt),
+      ]);
+      downloadCsv(`ncrims-call-logs-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    } catch (e) {
+      alert(`Export failed: ${e.message}`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <>
       <div className="page-head">
         <div><h1>Call Logs</h1><div className="desc">Every call with status, outcome, recording, and transcript.</div></div>
-        <button className="btn ghost"><Icon.Download />Export CSV</button>
+        <button className="btn ghost" onClick={exportCsv} disabled={exporting}>
+          <Icon.Download />{exporting ? 'Exporting…' : 'Export CSV'}
+        </button>
       </div>
 
       <div className="filters">

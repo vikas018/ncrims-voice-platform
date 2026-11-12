@@ -8,6 +8,7 @@ import Campaigns from './pages/Campaigns.jsx';
 import CallLogs from './pages/CallLogs.jsx';
 import Billing from './pages/Billing.jsx';
 import Users from './pages/Users.jsx';
+import Settings from './pages/Settings.jsx';
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="calls" element={<CallLogs />} />
         <Route path="billing" element={<Billing />} />
         <Route path="users" element={<Users />} />
+        <Route path="settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

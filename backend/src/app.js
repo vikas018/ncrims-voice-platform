@@ -9,6 +9,7 @@ import callRoutes from './routes/call.routes.js';
 import walletRoutes from './routes/wallet.routes.js';
 import webhookRoutes from './routes/webhook.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
+import orgRoutes from './routes/org.routes.js';
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use('/api/calls', callRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/org', orgRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

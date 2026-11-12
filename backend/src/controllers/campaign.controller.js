@@ -85,6 +85,52 @@ export const commitUpload = asyncHandler(async (req, res) => {
   });
 });
 
+const statusActionSchema = z.object({
+  action: z.enum(['pause', 'resume', 'complete']),
+});
+
+/**
+ * Pause / resume / complete a campaign.
+ *  - pause:    running -> paused
+ *  - resume:   paused  -> running (and re-triggers any still-queued calls)
+ *  - complete: running/paused -> completed
+ */
+export const setCampaignStatus = asyncHandler(async (req, res) => {
+  const { action } = statusActionSchema.parse(req.body);
+  const campaign = await Campaign.findOne({ _id: req.params.id, organizationId: req.organizationId });
+  if (!campaign) throw new ApiError(404, 'Campaign not found');
+
+  if (action === 'pause') {
+    if (campaign.status !== 'running') throw new ApiError(400, 'Only a running campaign can be paused');
+    campaign.status = 'paused';
+    await campaign.save();
+  } else if (action === 'resume') {
+    if (campaign.status !== 'paused') throw new ApiError(400, 'Only a paused campaign can be resumed');
+    // Re-trigger places only still-queued calls, so this is safe to call again.
+    await triggerCampaignCalls(campaign); // sets status back to 'running'
+  } else if (action === 'complete') {
+    if (campaign.status === 'completed') throw new ApiError(400, 'Campaign is already completed');
+    campaign.status = 'completed';
+    await campaign.save();
+  }
+
+  res.json({ campaign });
+});
+
+/** Delete a campaign and its call logs. A running campaign must be paused first. */
+export const deleteCampaign = asyncHandler(async (req, res) => {
+  const campaign = await Campaign.findOne({ _id: req.params.id, organizationId: req.organizationId });
+  if (!campaign) throw new ApiError(404, 'Campaign not found');
+  if (campaign.status === 'running') {
+    throw new ApiError(400, 'Pause the campaign before deleting it');
+  }
+
+  const { deletedCount } = await CallLog.deleteMany({ campaignId: campaign._id });
+  await campaign.deleteOne();
+  // Note: wallet ledger entries are kept — they are an immutable historical record.
+  res.json({ deleted: true, id: req.params.id, callLogsRemoved: deletedCount });
+});
+
 /** Launch outbound calls for all queued logs — with a wallet pre-check. */
 export const triggerCampaign = asyncHandler(async (req, res) => {
   const campaign = await Campaign.findOne({ _id: req.params.id, organizationId: req.organizationId });

@@ -70,13 +70,58 @@ export default function Campaigns() {
       const committed = await api.postForm(`/campaigns/${campaignId}/upload`, fd);
       const trig = await api.post(`/campaigns/${campaignId}/trigger`, {});
       notify(`Launched: ${trig.placed} calls placed (${committed.skipped} rows skipped).`);
-      // reset builder
+      // reset + close builder
       setForm({ name: '', type: 'camp_announcement', language: 'hinglish' });
       setCampaignId(null); setPreview(null); setFileName(''); setFileObj(null);
+      setShowCreate(false);
       await load();
       await refreshBalance();
     } catch (e) { notify(e.message, true); }
     finally { setBusy(false); }
+  };
+
+  // --- manage existing campaigns (pause / resume / complete / delete) ---
+  const [actioningId, setActioningId] = useState(null);
+
+  const campaignAction = async (c, action) => {
+    setActioningId(c._id);
+    try {
+      await api.patch(`/campaigns/${c._id}/status`, { action });
+      notify(`Campaign ${action === 'resume' ? 'resumed' : action === 'pause' ? 'paused' : 'completed'}.`);
+      await load();
+      if (action === 'resume') await refreshBalance();
+    } catch (e) { notify(e.message, true); }
+    finally { setActioningId(null); }
+  };
+
+  const removeCampaign = async (c) => {
+    if (!window.confirm(`Delete "${c.name}" and all its call logs? This cannot be undone.`)) return;
+    setActioningId(c._id);
+    try {
+      await api.del(`/campaigns/${c._id}`);
+      notify(`Deleted "${c.name}".`);
+      await load();
+    } catch (e) { notify(e.message, true); }
+    finally { setActioningId(null); }
+  };
+
+  // Launch an existing draft campaign that already has patients loaded.
+  const launchExisting = async (c) => {
+    setActioningId(c._id);
+    try {
+      const r = await api.post(`/campaigns/${c._id}/trigger`, {});
+      notify(`Launched: ${r.placed} of ${r.total} calls placed.`);
+      await load();
+      await refreshBalance();
+    } catch (e) { notify(e.message, true); }
+    finally { setActioningId(null); }
+  };
+
+  const [showCreate, setShowCreate] = useState(false);
+  const closeCreate = () => {
+    setShowCreate(false);
+    setForm({ name: '', type: 'camp_announcement', language: 'hinglish' });
+    setCampaignId(null); setPreview(null); setFileName(''); setFileObj(null);
   };
 
   const callLabel = { idle: 'Test Call in Browser', connecting: 'Connecting…', live: 'End call', ending: 'Ending…' }[call.state];
@@ -85,13 +130,20 @@ export default function Campaigns() {
     <>
       <div className="page-head">
         <div><h1>Campaigns</h1><div className="desc">Upload patients, preview, and launch outbound AI calls.</div></div>
+        {!showCreate && (
+          <button className="btn" onClick={() => setShowCreate(true)}><Icon.Plus />New campaign</button>
+        )}
       </div>
 
-      {/* Builder */}
+      {/* Builder — shown only when creating */}
+      {showCreate && (
       <div className="card" style={{ marginBottom: 22 }}>
         <div className="card-head">
           <h3>Create new campaign</h3>
-          <Badge tone="b-info">{preview ? 'Step 2 · Review & launch' : 'Step 1 · Details'}</Badge>
+          <div className="pill-row" style={{ alignItems: 'center' }}>
+            <Badge tone="b-info">{preview ? 'Step 2 · Review & launch' : 'Step 1 · Details'}</Badge>
+            <button className="iconbtn" onClick={closeCreate} aria-label="Close"><Icon.Close /></button>
+          </div>
         </div>
         <div style={{ padding: 18 }}>
           <div className="grid" style={{ gridTemplateColumns: '1.4fr 1fr 1fr', gap: 14 }}>
@@ -212,6 +264,7 @@ export default function Campaigns() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Existing */}
       <div className="card">
@@ -221,19 +274,44 @@ export default function Campaigns() {
             <div className="empty">No campaigns yet.</div>
           ) : (
             <table>
-              <thead><tr><th>Campaign</th><th>Type</th><th>Patients</th><th>Connected</th><th>Confirmed</th><th>Min used</th><th>Status</th></tr></thead>
+              <thead><tr><th>Campaign</th><th>Type</th><th>Patients</th><th>Connected</th><th>Confirmed</th><th>Min used</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody>
-                {campaigns.map((c) => (
-                  <tr key={c._id}>
-                    <td><div className="t-name">{c.name}</div></td>
-                    <td><Badge tone="b-info">{CAMPAIGN_TYPE_LABEL[c.type]}</Badge></td>
-                    <td className="num">{fmtInt(c.stats.total)}</td>
-                    <td className="num">{fmtInt(c.stats.connected)}</td>
-                    <td className="num">{c.stats.confirmed ? fmtInt(c.stats.confirmed) : '—'}</td>
-                    <td className="num">{fmtInt(c.stats.minutesConsumed)}</td>
-                    <td><Badge tone={c.status === 'running' ? 'b-good' : 'b-mut'}>{c.status[0].toUpperCase() + c.status.slice(1)}</Badge></td>
-                  </tr>
-                ))}
+                {campaigns.map((c) => {
+                  const busyRow = actioningId === c._id;
+                  return (
+                    <tr key={c._id} style={{ opacity: busyRow ? 0.5 : 1 }}>
+                      <td><div className="t-name">{c.name}</div></td>
+                      <td><Badge tone="b-info">{CAMPAIGN_TYPE_LABEL[c.type]}</Badge></td>
+                      <td className="num">{fmtInt(c.stats.total)}</td>
+                      <td className="num">{fmtInt(c.stats.connected)}</td>
+                      <td className="num">{c.stats.confirmed ? fmtInt(c.stats.confirmed) : '—'}</td>
+                      <td className="num">{fmtInt(c.stats.minutesConsumed)}</td>
+                      <td><Badge tone={c.status === 'running' ? 'b-good' : 'b-mut'}>{c.status[0].toUpperCase() + c.status.slice(1)}</Badge></td>
+                      <td>
+                        <div className="pill-row">
+                          {c.status === 'draft' && c.stats.total > 0 && (
+                            <button className="btn sm" disabled={busyRow} onClick={() => launchExisting(c)}>Launch</button>
+                          )}
+                          {c.status === 'running' && (
+                            <button className="btn ghost sm" disabled={busyRow} onClick={() => campaignAction(c, 'pause')}>Pause</button>
+                          )}
+                          {c.status === 'paused' && (
+                            <button className="btn ghost sm" disabled={busyRow} onClick={() => campaignAction(c, 'resume')}>Resume</button>
+                          )}
+                          {(c.status === 'running' || c.status === 'paused') && (
+                            <button className="btn ghost sm" disabled={busyRow} onClick={() => campaignAction(c, 'complete')}>Complete</button>
+                          )}
+                          {c.status !== 'running' && (
+                            <button className="btn ghost sm" disabled={busyRow} onClick={() => removeCampaign(c)}
+                              style={{ color: 'var(--bad)', borderColor: 'color-mix(in srgb, var(--bad) 40%, transparent)' }}>
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

@@ -4,8 +4,8 @@ import { placeTestCall } from '../services/call.service.js';
 import { normalizePhone } from '../services/csv.service.js';
 import { asyncHandler, ApiError } from '../utils/asyncHandler.js';
 
-/** List call logs with filters: campaign, status, outcome, date range, search. */
-export const listCalls = asyncHandler(async (req, res) => {
+/** Build the Mongo filter from query params — shared by list and export. */
+function buildCallFilter(req) {
   const { campaignId, status, outcome, q, from, to } = req.query;
   const filter = { organizationId: req.organizationId };
   if (campaignId) filter.campaignId = campaignId;
@@ -22,7 +22,12 @@ export const listCalls = asyncHandler(async (req, res) => {
     if (from) filter.createdAt.$gte = new Date(from);
     if (to) filter.createdAt.$lte = new Date(to);
   }
+  return filter;
+}
 
+/** List call logs with filters: campaign, status, outcome, date range, search. */
+export const listCalls = asyncHandler(async (req, res) => {
+  const filter = buildCallFilter(req);
   const page = Math.max(1, parseInt(req.query.page || '1', 10));
   const limit = Math.min(100, parseInt(req.query.limit || '25', 10));
 
@@ -32,6 +37,16 @@ export const listCalls = asyncHandler(async (req, res) => {
   ]);
 
   res.json({ calls, page, limit, total });
+});
+
+/** Export ALL call logs matching the current filters (no pagination) for CSV. */
+export const exportCalls = asyncHandler(async (req, res) => {
+  const filter = buildCallFilter(req);
+  const calls = await CallLog.find(filter)
+    .sort({ createdAt: -1 })
+    .limit(50000) // safety cap
+    .populate('campaignId', 'name');
+  res.json({ calls, total: calls.length });
 });
 
 export const getCall = asyncHandler(async (req, res) => {

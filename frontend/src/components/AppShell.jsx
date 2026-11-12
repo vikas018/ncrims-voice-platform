@@ -9,7 +9,7 @@ import { fmtInt, initials } from '../utils/format.js';
 
 const TITLES = {
   '/': 'Dashboard', '/campaigns': 'Campaigns', '/calls': 'Call Logs',
-  '/billing': 'Billing & Minutes', '/users': 'Users & Roles',
+  '/billing': 'Billing & Minutes', '/users': 'Users & Roles', '/settings': 'Settings',
 };
 
 export default function AppShell() {
@@ -35,11 +35,10 @@ export default function AppShell() {
   }, [menuOpen]);
 
   const toggleTheme = () => {
-    const cur =
-      document.documentElement.getAttribute('data-theme') ||
-      (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    const cur = document.documentElement.getAttribute('data-theme') || 'light';
     const next = cur === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('ncrims_theme', next); // persist the choice across reloads
     setTheme(next);
   };
 
@@ -59,6 +58,7 @@ export default function AppShell() {
           <NavLink to="/billing" className={navClass}><Icon.Billing />Billing &amp; Minutes</NavLink>
           <div className="nav-sect">Administration</div>
           <NavLink to="/users" className={navClass}><Icon.Users />Users &amp; Roles</NavLink>
+          <NavLink to="/settings" className={navClass}><Icon.Settings />Settings</NavLink>
         </nav>
         <div className="sb-foot">
           <div className="avatar">{initials(user?.name)}</div>

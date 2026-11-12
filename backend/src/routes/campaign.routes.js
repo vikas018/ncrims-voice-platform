@@ -7,6 +7,8 @@ import {
   previewUpload,
   commitUpload,
   triggerCampaign,
+  setCampaignStatus,
+  deleteCampaign,
 } from '../controllers/campaign.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 
@@ -22,5 +24,7 @@ router.get('/:id', getCampaign);
 router.post('/:id/preview', upload.single('file'), previewUpload);
 router.post('/:id/upload', upload.single('file'), commitUpload);
 router.post('/:id/trigger', triggerCampaign);
+router.patch('/:id/status', setCampaignStatus);
+router.delete('/:id', deleteCampaign);
 
 export default router;
