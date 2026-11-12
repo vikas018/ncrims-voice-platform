@@ -1,0 +1,6 @@
+# root ignore — each app also has its own
+node_modules/
+.env
+dist/
+*.log
+.DS_Store

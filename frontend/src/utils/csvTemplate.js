@@ -1,0 +1,39 @@
+/**
+ * The patient-upload template. Headers match exactly what the backend CSV
+ * parser expects (Name + Phone required; the rest optional). Demo rows show
+ * the accepted formats — plain 10-digit, +91, and leading-0 are all valid.
+ */
+export const TEMPLATE_HEADERS = ['Name', 'Phone', 'Doctor/Dept', 'Appointment', 'Purpose'];
+
+const DEMO_ROWS = [
+  ['Rohit Verma', '9811023456', 'Dr. Mehra · Endocrinology', '2026-11-18 10:30', 'Camp registration'],
+  ['Sunita Devi', '+91 99100 87654', 'Dr. Mehra · Endocrinology', '2026-11-18 11:00', 'Camp registration'],
+  ['Kavita Nair', '09700011223', 'Dr. Rao · General Med', '2026-11-19 09:15', 'Appointment confirmation'],
+  ['Deepak Chauhan', '9810576543', 'Dr. Khanna · Cardiology', '2026-11-20 09:00', 'Follow-up'],
+];
+
+function toCsvCell(value) {
+  const s = String(value ?? '');
+  // Quote cells containing commas, quotes, or newlines (RFC-4180).
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** Build the CSV text (headers + demo rows, or headers only). */
+export function buildTemplateCsv({ includeDemo = true } = {}) {
+  const rows = [TEMPLATE_HEADERS, ...(includeDemo ? DEMO_ROWS : [])];
+  return rows.map((r) => r.map(toCsvCell).join(',')).join('\r\n');
+}
+
+/** Trigger a browser download of the template file. */
+export function downloadTemplate({ includeDemo = true } = {}) {
+  const csv = buildTemplateCsv({ includeDemo });
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }); // BOM = Excel-friendly
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = includeDemo ? 'ncrims-patient-template-sample.csv' : 'ncrims-patient-template-blank.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
