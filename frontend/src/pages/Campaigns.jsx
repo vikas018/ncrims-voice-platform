@@ -346,8 +346,37 @@ export default function Campaigns() {
                         : 'Hear the AI agent live in your browser. Add a Vapi key for a real call; runs simulated otherwise.'}
                   </p>
                 </div>
-                {call.state === 'live' && <span className="badge b-bad"><span className="bd" />● LIVE</span>}
+                {call.state === 'live' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                    <span className="badge b-bad"><span className="bd" />● LIVE</span>
+                    <span className="num" style={{
+                      fontWeight: 700, fontSize: 15,
+                      color: call.elapsed >= call.maxSeconds - 15 ? 'var(--bad)' : call.elapsed >= 30 ? 'var(--warn)' : 'var(--txt)',
+                    }}>
+                      {Math.floor(call.elapsed / 60)}:{String(call.elapsed % 60).padStart(2, '0')}
+                    </span>
+                  </div>
+                )}
               </div>
+              {call.state === 'live' && (
+                <div className="hint" style={{ marginTop: 6 }}>
+                  Live call running — click the button to hang up. Auto-stops at {Math.floor(call.maxSeconds / 60)}:00 to protect credits.
+                </div>
+              )}
+              {call.errorMsg && <div className="err-text" style={{ marginTop: 8 }}>⚠ {call.errorMsg}</div>}
+
+              {/* Live transcript of the conversation */}
+              {call.transcript.length > 0 && (
+                <div className="transcript" style={{ marginTop: 12, maxHeight: 240, overflowY: 'auto' }}>
+                  <div className="th">Live transcript</div>
+                  {call.transcript.map((t, i) => (
+                    <div className="turn" key={i}>
+                      <div className={`who ${t.role === 'assistant' ? 'ai' : 'pt'}`}>{t.role === 'assistant' ? 'AI' : 'You'}</div>
+                      <div className="say">{t.text}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
               </>
             )}
           </div>
