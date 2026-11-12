@@ -16,6 +16,8 @@ app.use(cors({ origin: config.corsOrigin, credentials: true }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Root route — many hosts health-check "/"; return 200 so deploys pass.
+app.get('/', (req, res) => res.json({ service: 'ncrims-backend', status: 'ok' }));
 app.get('/api/health', (req, res) => res.json({ status: 'ok', env: config.env, provider: config.voice.provider }));
 
 app.use('/api/auth', authRoutes);
