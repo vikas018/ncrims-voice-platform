@@ -13,7 +13,23 @@ import orgRoutes from './routes/org.routes.js';
 
 const app = express();
 
-app.use(cors({ origin: config.corsOrigin, credentials: true }));
+// CORS: allow configured origins, localhost (any port), and ANY *.vercel.app
+// deployment (so preview URLs never 403). CORS_ORIGIN=* allows everything.
+app.use(
+  cors({
+    origin(origin, cb) {
+      if (!origin) return cb(null, true); // same-origin / curl / server-to-server
+      if (config.corsOrigin.includes('*')) return cb(null, true);
+      if (config.corsOrigin.includes(origin)) return cb(null, true);
+      try {
+        const host = new URL(origin).hostname;
+        if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.vercel.app')) return cb(null, true);
+      } catch { /* malformed origin */ }
+      return cb(new Error(`Not allowed by CORS: ${origin}`));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 

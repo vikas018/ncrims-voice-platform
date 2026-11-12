@@ -42,6 +42,18 @@ const config = {
 
   voice: {
     provider: optional('VOICE_PROVIDER', 'vapi').toLowerCase(),
+    // Two-engine routing: which provider handles each campaign engine.
+    // Demo defaults both to the global provider (vapi); in production set
+    // ANNOUNCEMENT_PROVIDER=plivo and CONVERSATION_PROVIDER=sarvam.
+    announcementProvider: optional('ANNOUNCEMENT_PROVIDER', '').toLowerCase(),
+    conversationProvider: optional('CONVERSATION_PROVIDER', '').toLowerCase(),
+    plivo: {
+      authId: optional('PLIVO_AUTH_ID', ''),
+      authToken: optional('PLIVO_AUTH_TOKEN', ''),
+      fromNumber: optional('PLIVO_FROM_NUMBER', ''),
+      answerUrl: optional('PLIVO_ANSWER_URL', ''),
+      webhookSecret: optional('PLIVO_WEBHOOK_SECRET', ''),
+    },
     vapi: {
       apiKey: optional('VAPI_API_KEY', ''),
       assistantId: optional('VAPI_ASSISTANT_ID', ''),

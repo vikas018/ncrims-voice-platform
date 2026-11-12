@@ -22,7 +22,7 @@ export function useVapiCall() {
   const assistantId = import.meta.env.VITE_VAPI_ASSISTANT_ID;
   const isLive = Boolean(publicKey && assistantId);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (overrides) => {
     if (state !== 'idle') return;
     setState('connecting');
 
@@ -44,7 +44,12 @@ export function useVapiCall() {
       vapi.on('call-start', () => setState('live'));
       vapi.on('call-end', () => setState('idle'));
       vapi.on('error', () => setState('idle'));
-      await vapi.start(assistantId);
+      // Build per-call assistant overrides from the form (first message + prompt),
+      // so the demo uses whatever the user typed without editing the Vapi dashboard.
+      const assistantOverrides = {};
+      if (overrides?.firstMessage) assistantOverrides.firstMessage = overrides.firstMessage;
+      if (overrides?.systemPrompt) assistantOverrides.model = { messages: [{ role: 'system', content: overrides.systemPrompt }] };
+      await vapi.start(assistantId, Object.keys(assistantOverrides).length ? assistantOverrides : undefined);
     } catch (err) {
       console.error('Vapi SDK not available, falling back to demo:', err);
       timers.current.push(setTimeout(() => setState('live'), 1200));

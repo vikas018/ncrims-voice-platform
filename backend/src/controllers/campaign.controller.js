@@ -9,13 +9,22 @@ import { asyncHandler, ApiError } from '../utils/asyncHandler.js';
 const createSchema = z.object({
   name: z.string().min(1),
   type: z.enum(['confirmation', 'camp_announcement', 'followup']),
+  engine: z.enum(['announcement', 'conversation']).optional(),
   language: z.enum(['hi', 'en', 'hinglish']).default('hinglish'),
+  announcementMessage: z.string().max(1000).optional(),
+  conversationFirstMessage: z.string().max(500).optional(),
+  conversationPrompt: z.string().max(2000).optional(),
 });
+
+// Default engine by campaign purpose: lead-gen-style follow-ups lean
+// conversational; confirmations/announcements are one-way.
+const DEFAULT_ENGINE = { confirmation: 'announcement', camp_announcement: 'announcement', followup: 'conversation' };
 
 export const createCampaign = asyncHandler(async (req, res) => {
   const data = createSchema.parse(req.body);
   const campaign = await Campaign.create({
     ...data,
+    engine: data.engine || DEFAULT_ENGINE[data.type] || 'announcement',
     organizationId: req.organizationId,
     createdBy: req.user._id,
     status: 'draft',

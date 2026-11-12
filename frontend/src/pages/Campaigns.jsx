@@ -3,8 +3,9 @@ import { useOutletContext } from 'react-router-dom';
 import { api } from '../api/client.js';
 import { Badge, Icon, Toast } from '../components/ui.jsx';
 import { useVapiCall } from '../hooks/useVapiCall.js';
+import AnnouncementPreview from '../components/AnnouncementPreview.jsx';
 import { downloadTemplate } from '../utils/csvTemplate.js';
-import { fmtInt, CAMPAIGN_TYPE_LABEL } from '../utils/format.js';
+import { fmtInt, CAMPAIGN_TYPE_LABEL, ENGINE_LABEL, DEFAULT_ENGINE } from '../utils/format.js';
 
 export default function Campaigns() {
   const { refreshBalance } = useOutletContext();
@@ -12,7 +13,19 @@ export default function Campaigns() {
   const [toast, setToast] = useState(null);
 
   // new-campaign builder state
-  const [form, setForm] = useState({ name: '', type: 'camp_announcement', language: 'hinglish' });
+  const DEFAULT_MESSAGE =
+    'Namaste {name} ji. NCRIMS Hospital se. Aapka appointment {doctor} ke saath {date} ko hai. ' +
+    'Confirm karne ke liye 1 dabayein. Reschedule ke liye 2 dabayein. Cancel ke liye 3 dabayein.';
+  const DEFAULT_FIRST = 'Namaste! Main NCRIMS hospital se bol rahi hoon. Kya main aapki appointment confirm kar sakti hoon?';
+  const DEFAULT_PROMPT =
+    'You are a polite female appointment-confirmation assistant for NCRIMS hospital in India. ' +
+    'Speak naturally in Hinglish, warm and brief. Confirm the appointment, help reschedule if asked. ' +
+    'Keep replies to 1-2 short sentences. Thank them and end politely. Do not give medical advice.';
+  const DEFAULT_FORM = {
+    name: '', type: 'camp_announcement', engine: 'announcement', language: 'hinglish',
+    announcementMessage: DEFAULT_MESSAGE, conversationFirstMessage: DEFAULT_FIRST, conversationPrompt: DEFAULT_PROMPT,
+  };
+  const [form, setForm] = useState(DEFAULT_FORM);
   const [campaignId, setCampaignId] = useState(null);
   const [preview, setPreview] = useState(null); // { summary, valid, invalid }
   const [fileName, setFileName] = useState('');
@@ -71,7 +84,7 @@ export default function Campaigns() {
       const trig = await api.post(`/campaigns/${campaignId}/trigger`, {});
       notify(`Launched: ${trig.placed} calls placed (${committed.skipped} rows skipped).`);
       // reset + close builder
-      setForm({ name: '', type: 'camp_announcement', language: 'hinglish' });
+      setForm(DEFAULT_FORM);
       setCampaignId(null); setPreview(null); setFileName(''); setFileObj(null);
       setShowCreate(false);
       await load();
@@ -120,8 +133,22 @@ export default function Campaigns() {
   const [showCreate, setShowCreate] = useState(false);
   const closeCreate = () => {
     setShowCreate(false);
-    setForm({ name: '', type: 'camp_announcement', language: 'hinglish' });
+    setForm(DEFAULT_FORM);
     setCampaignId(null); setPreview(null); setFileName(''); setFileObj(null);
+  };
+
+  // Real Vapi conversation calls burn credits — gate them behind a password.
+  // (Simulated/no-key calls are free, so no password needed there.)
+  const CALL_PASSWORD = '1995';
+  const startConversationCall = () => {
+    if (call.state !== 'idle') { call.stop(); return; }
+    if (call.isLive) {
+      const pw = window.prompt('Live call password (protects Vapi credits):');
+      if (pw === null) return;
+      if (pw !== CALL_PASSWORD) { notify('Wrong password — live call blocked to protect credits.', true); return; }
+    }
+    // Use whatever the user typed in the conversation form for this call.
+    call.start({ firstMessage: form.conversationFirstMessage, systemPrompt: form.conversationPrompt });
   };
 
   const callLabel = { idle: 'Test Call in Browser', connecting: 'Connecting…', live: 'End call', ending: 'Ending…' }[call.state];
@@ -155,7 +182,7 @@ export default function Campaigns() {
             <div className="field" style={{ margin: 0 }}>
               <label>Type</label>
               <select className="select" style={{ width: '100%' }} value={form.type}
-                onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                onChange={(e) => { const t = e.target.value; setForm({ ...form, type: t, engine: DEFAULT_ENGINE[t] }); }}>
                 <option value="camp_announcement">Camp announcement</option>
                 <option value="confirmation">Appointment confirmation</option>
                 <option value="followup">Follow-up</option>
@@ -171,6 +198,47 @@ export default function Campaigns() {
               </select>
             </div>
           </div>
+
+          {/* Calling mode (two-engine model) */}
+          <div style={{ marginTop: 16 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--txt-2)' }}>Calling mode</label>
+            <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
+              {[
+                { id: 'announcement', title: 'Announcement', desc: 'Patient listens and presses a key (1 = confirm, 2 = reschedule). Best for confirmations & camp announcements.' },
+                { id: 'conversation', title: 'Conversation', desc: 'Interactive AI dialogue — the patient talks back. Best for follow-ups, qualifying & lead generation.' },
+              ].map((m) => (
+                <button type="button" key={m.id} onClick={() => setForm({ ...form, engine: m.id })}
+                  className="card" style={{
+                    padding: 14, textAlign: 'left', cursor: 'pointer', boxShadow: 'none',
+                    borderColor: form.engine === m.id ? 'var(--teal)' : 'var(--line)',
+                    background: form.engine === m.id ? 'var(--teal-50)' : 'var(--card)',
+                  }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 650, fontSize: 13.5 }}>
+                    <span style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${form.engine === m.id ? 'var(--teal)' : 'var(--line-strong)'}`, display: 'grid', placeItems: 'center' }}>
+                      {form.engine === m.id && <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--teal)' }} />}
+                    </span>
+                    {m.title}
+                  </div>
+                  <div className="t-sub" style={{ marginTop: 6 }}>{m.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Announcement message script — only for the announcement engine */}
+          {form.engine === 'announcement' && (
+            <div style={{ marginTop: 16 }}>
+              <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--txt-2)' }}>Announcement message</label>
+              <textarea value={form.announcementMessage} rows={4}
+                onChange={(e) => setForm({ ...form, announcementMessage: e.target.value })}
+                style={{ width: '100%', marginTop: 8, padding: '11px 13px', border: '1px solid var(--line-strong)',
+                  borderRadius: 8, background: 'var(--card)', color: 'var(--txt)', fontSize: 14, fontFamily: 'inherit', resize: 'vertical' }}
+                placeholder="What the patient will hear…" />
+              <div className="hint">
+                Use <b>{'{name}'}</b>, <b>{'{doctor}'}</b>, <b>{'{date}'}</b> — filled per patient from your CSV. The preview below plays this exact message.
+              </div>
+            </div>
+          )}
 
           {/* Upload */}
           <div style={{ marginTop: 18 }}>
@@ -236,21 +304,52 @@ export default function Campaigns() {
             )}
           </div>
 
-          {/* Test call */}
-          <div className="testcall" style={{ marginTop: 20 }}>
-            <button className={`pulse-btn ${call.state === 'live' ? 'live' : ''}`}
-              onClick={() => (call.state === 'idle' ? call.start() : call.stop())} aria-label="Test call">
-              <Icon.Phone width="26" height="26" />
-            </button>
-            <div style={{ flex: 1 }}>
-              <h4 style={{ fontSize: 15 }}>{callLabel}</h4>
-              <p className="t-sub" style={{ marginTop: 3, maxWidth: '52ch' }}>
-                {call.state === 'live'
-                  ? (call.isLive ? 'You are live with the AI agent — speak now.' : 'Demo mode: simulated live call. Set VITE_VAPI_PUBLIC_KEY for a real browser call.')
-                  : 'Hear the AI agent live in your browser before you launch. Zero cost, no phone number — your demo button.'}
-              </p>
-            </div>
-            {call.state === 'live' && <span className="badge b-bad"><span className="bd" />● LIVE</span>}
+          {/* Test experience — depends on the chosen calling mode */}
+          <div style={{ marginTop: 20 }}>
+            {form.engine === 'announcement' ? (
+              // FREE unlimited announcement preview (browser speech, no credits)
+              <AnnouncementPreview message={form.announcementMessage} />
+            ) : (
+              <>
+              {/* Editable AI script for the conversation */}
+              <div style={{ marginBottom: 14 }}>
+                <div className="field" style={{ marginBottom: 12 }}>
+                  <label>First message <span className="t-sub">what the AI says when the patient answers</span></label>
+                  <input value={form.conversationFirstMessage}
+                    onChange={(e) => setForm({ ...form, conversationFirstMessage: e.target.value })} />
+                </div>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label>AI instructions <span className="t-sub">how the AI should behave</span></label>
+                  <textarea value={form.conversationPrompt} rows={4}
+                    onChange={(e) => setForm({ ...form, conversationPrompt: e.target.value })}
+                    style={{ width: '100%', padding: '11px 13px', border: '1px solid var(--line-strong)', borderRadius: 8,
+                      background: 'var(--card)', color: 'var(--txt)', fontSize: 14, fontFamily: 'inherit', resize: 'vertical' }} />
+                  <div className="hint">These apply to the live test call. For production, they're saved with the campaign.</div>
+                </div>
+              </div>
+              {/* Real AI conversation — password-locked to protect Vapi credits */}
+              <div className="testcall">
+                <button className={`pulse-btn ${call.state === 'live' ? 'live' : ''}`}
+                  onClick={startConversationCall} aria-label="Test call">
+                  <Icon.Phone width="26" height="26" />
+                </button>
+                <div style={{ flex: 1 }}>
+                  <h4 style={{ fontSize: 15, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {callLabel}
+                    {call.isLive && call.state === 'idle' && <Badge tone="b-warn">🔒 password</Badge>}
+                  </h4>
+                  <p className="t-sub" style={{ marginTop: 3, maxWidth: '54ch' }}>
+                    {call.state === 'live'
+                      ? (call.isLive ? 'You are live with the AI agent — speak now.' : 'Demo mode: simulated call (no Vapi key set).')
+                      : call.isLive
+                        ? 'Live AI conversation call. Password-protected so credits are never burned by accident.'
+                        : 'Hear the AI agent live in your browser. Add a Vapi key for a real call; runs simulated otherwise.'}
+                  </p>
+                </div>
+                {call.state === 'live' && <span className="badge b-bad"><span className="bd" />● LIVE</span>}
+              </div>
+              </>
+            )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 20, flexWrap: 'wrap' }}>
@@ -274,7 +373,7 @@ export default function Campaigns() {
             <div className="empty">No campaigns yet.</div>
           ) : (
             <table>
-              <thead><tr><th>Campaign</th><th>Type</th><th>Patients</th><th>Connected</th><th>Confirmed</th><th>Min used</th><th>Status</th><th>Actions</th></tr></thead>
+              <thead><tr><th>Campaign</th><th>Type</th><th>Mode</th><th>Patients</th><th>Connected</th><th>Confirmed</th><th>Min used</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody>
                 {campaigns.map((c) => {
                   const busyRow = actioningId === c._id;
@@ -282,6 +381,7 @@ export default function Campaigns() {
                     <tr key={c._id} style={{ opacity: busyRow ? 0.5 : 1 }}>
                       <td><div className="t-name">{c.name}</div></td>
                       <td><Badge tone="b-info">{CAMPAIGN_TYPE_LABEL[c.type]}</Badge></td>
+                      <td><Badge tone={c.engine === 'conversation' ? 'b-good' : 'b-mut'}>{ENGINE_LABEL[c.engine] || 'Announcement'}</Badge></td>
                       <td className="num">{fmtInt(c.stats.total)}</td>
                       <td className="num">{fmtInt(c.stats.connected)}</td>
                       <td className="num">{c.stats.confirmed ? fmtInt(c.stats.confirmed) : '—'}</td>

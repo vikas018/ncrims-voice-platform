@@ -38,6 +38,12 @@ export const CAMPAIGN_TYPE_LABEL = {
   confirmation: 'Confirm', camp_announcement: 'Camp', followup: 'Follow-up',
 };
 
+export const ENGINE_LABEL = { announcement: 'Announcement', conversation: 'Conversation' };
+// Sensible default engine per campaign type (user can override).
+export const DEFAULT_ENGINE = {
+  confirmation: 'announcement', camp_announcement: 'announcement', followup: 'conversation',
+};
+
 export function statusTone(status) {
   if (status === 'connected') return 'b-good';
   if (status === 'unanswered') return 'b-warn';

@@ -15,7 +15,21 @@ const campaignSchema = new mongoose.Schema(
       enum: ['confirmation', 'camp_announcement', 'followup'],
       required: true,
     },
+    // Which calling engine this campaign uses:
+    //  announcement = patient listens + presses a key (cheap: Plivo + TTS)
+    //  conversation = interactive AI dialogue (full stack: Sarvam)
+    engine: {
+      type: String,
+      enum: ['announcement', 'conversation'],
+      default: 'announcement',
+    },
     language: { type: String, enum: ['hi', 'en', 'hinglish'], default: 'hinglish' },
+    // The spoken script for announcement campaigns. Supports {name}, {doctor},
+    // {date} placeholders, filled per patient at call time.
+    announcementMessage: { type: String, default: '' },
+    // For conversation campaigns: the AI's opening line + behavior instructions.
+    conversationFirstMessage: { type: String, default: '' },
+    conversationPrompt: { type: String, default: '' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     status: {
       type: String,
