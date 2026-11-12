@@ -35,7 +35,9 @@ const config = {
 
   billing: {
     minPulseSeconds: parseInt(optional('BILLING_MIN_PULSE_SECONDS', '60'), 10),
-    overageMode: optional('BILLING_OVERAGE_MODE', 'whole_minute'), // whole_minute | per_second
+    // VOICEARTAI terms: 1-minute minimum, then actual connected duration -> per_second.
+    overageMode: optional('BILLING_OVERAGE_MODE', 'per_second'), // whole_minute | per_second
+    gstPercent: parseInt(optional('BILLING_GST_PERCENT', '18'), 10),
   },
 
   voice: {

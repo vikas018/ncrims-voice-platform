@@ -38,7 +38,22 @@ export function buildTemplateCsv({ includeDemo = true } = {}) {
   return rows.map((r) => r.map(toCsvCell).join(',')).join('\r\n');
 }
 
-/** Trigger a browser download of the template file. */
+// ---- Staff upload template ----
+export const USER_TEMPLATE_HEADERS = ['Name', 'Email', 'Role', 'Password'];
+const USER_DEMO_ROWS = [
+  ['Neha Singh', 'neha.singh@ncrims.in', 'staff', 'ncrims@123'],
+  ['Amit Rao', 'amit.rao@ncrims.in', 'staff', 'ncrims@123'],
+  ['Dr. Anil Kumar', 'anil.kumar@ncrims.in', 'admin', 'ncrims@123'],
+];
+
+/** Download the staff-upload template (Name, Email, Role, Password). */
+export function downloadUserTemplate({ includeDemo = true } = {}) {
+  const rows = [USER_TEMPLATE_HEADERS, ...(includeDemo ? USER_DEMO_ROWS : [])];
+  downloadCsv(includeDemo ? 'ncrims-staff-template-sample.csv' : 'ncrims-staff-template-blank.csv',
+    rows[0], rows.slice(1));
+}
+
+/** Trigger a browser download of the patient template file. */
 export function downloadTemplate({ includeDemo = true } = {}) {
   const csv = buildTemplateCsv({ includeDemo });
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }); // BOM = Excel-friendly

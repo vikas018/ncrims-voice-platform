@@ -76,4 +76,65 @@ export function parsePatientCsv(buffer) {
   return { valid, invalid, totalRows: records.length - 1 };
 }
 
-export default { parsePatientCsv, normalizePhone };
+/**
+ * Parse a staff-upload CSV into validated user rows.
+ * Columns (case-insensitive): Name, Email, Role, Password.
+ * Role defaults to "staff"; Password defaults to a shared temp password that
+ * staff change on first login via their profile.
+ */
+const USER_HEADER_ALIASES = {
+  name: ['name', 'full name', 'fullname', 'staff', 'staff name'],
+  email: ['email', 'e-mail', 'email address', 'mail'],
+  role: ['role', 'type', 'access'],
+  password: ['password', 'temp password', 'temporary password', 'pass'],
+};
+
+const DEFAULT_TEMP_PASSWORD = 'ncrims@123';
+
+function resolveUserHeaders(rawHeaders) {
+  const map = {};
+  rawHeaders.forEach((h, i) => {
+    const key = String(h).trim().toLowerCase();
+    for (const [field, aliases] of Object.entries(USER_HEADER_ALIASES)) {
+      if (aliases.includes(key)) map[field] = i;
+    }
+  });
+  return map;
+}
+
+export function parseUserCsv(buffer) {
+  const records = parse(buffer, { skip_empty_lines: true, trim: true });
+  if (records.length === 0) return { valid: [], invalid: [], totalRows: 0 };
+
+  const h = resolveUserHeaders(records[0]);
+  if (h.name === undefined || h.email === undefined) {
+    throw new Error('CSV must contain at least "Name" and "Email" columns.');
+  }
+
+  const valid = [];
+  const invalid = [];
+  const seenEmails = new Set();
+
+  for (let r = 1; r < records.length; r++) {
+    const row = records[r];
+    const name = (row[h.name] || '').trim();
+    const email = (row[h.email] || '').trim().toLowerCase();
+    let role = h.role !== undefined ? (row[h.role] || '').trim().toLowerCase() : 'staff';
+    if (role !== 'admin' && role !== 'staff') role = 'staff';
+    const password = (h.password !== undefined ? (row[h.password] || '').trim() : '') || DEFAULT_TEMP_PASSWORD;
+
+    const errors = [];
+    if (!name) errors.push('Missing name');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push('Invalid email');
+    if (email && seenEmails.has(email)) errors.push('Duplicate email in file');
+    seenEmails.add(email);
+
+    const base = { rowNumber: r + 1, name, email, role, password };
+    if (errors.length) invalid.push({ ...base, errors });
+    else valid.push(base);
+  }
+
+  return { valid, invalid, totalRows: records.length - 1, defaultPassword: DEFAULT_TEMP_PASSWORD };
+}
+
+export default { parsePatientCsv, parseUserCsv, normalizePhone };

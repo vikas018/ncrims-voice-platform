@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Badge, Icon, Toast } from '../components/ui.jsx';
+import { downloadUserTemplate } from '../utils/csvTemplate.js';
 import { initials, fmtDateTime } from '../utils/format.js';
 
 export default function Users() {
@@ -16,7 +17,22 @@ export default function Users() {
   const load = () => api.get('/auth/users').then((d) => setUsers(d.users)).catch(() => {});
   useEffect(() => { load(); }, []);
 
-  const notify = (message, bad) => { setToast({ message, bad }); setTimeout(() => setToast(null), 3200); };
+  const notify = (message, bad) => { setToast({ message, bad }); setTimeout(() => setToast(null), 4500); };
+
+  const bulkInput = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const handleBulkUpload = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const r = await api.postForm('/auth/users/bulk', fd);
+      notify(`Added ${r.created} staff${r.skipped ? `, skipped ${r.skipped}` : ''}. Temp password: ${r.defaultPassword}`);
+      await load();
+    } catch (e) { notify(e.message, true); }
+    finally { setUploading(false); if (bulkInput.current) bulkInput.current.value = ''; }
+  };
 
   const invite = async (e) => {
     e.preventDefault();
@@ -59,7 +75,17 @@ export default function Users() {
     <>
       <div className="page-head">
         <div><h1>Users &amp; Roles</h1><div className="desc">Manage who can run campaigns and who controls the wallet.</div></div>
-        {isAdmin && <button className="btn" onClick={() => setShowForm((s) => !s)}><Icon.Plus />Invite staff</button>}
+        {isAdmin && (
+          <div className="pill-row" style={{ alignItems: 'center' }}>
+            <button type="button" className="dl-link" onClick={() => downloadUserTemplate({ includeDemo: true })}>Download template</button>
+            <button className="btn ghost" disabled={uploading} onClick={() => bulkInput.current?.click()}>
+              <Icon.Download />{uploading ? 'Uploading…' : 'Bulk upload'}
+            </button>
+            <button className="btn" onClick={() => setShowForm((s) => !s)}><Icon.Plus />Invite staff</button>
+            <input ref={bulkInput} type="file" accept=".csv,text/csv" hidden
+              onChange={(e) => handleBulkUpload(e.target.files?.[0])} />
+          </div>
+        )}
       </div>
 
       {showForm && isAdmin && (

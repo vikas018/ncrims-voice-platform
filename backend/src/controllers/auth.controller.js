@@ -87,6 +87,41 @@ export const listUsers = asyncHandler(async (req, res) => {
   res.json({ users: users.map((u) => u.toSafeJSON()) });
 });
 
+/** Admin-only: create many staff from an uploaded CSV (Name, Email, Role, Password). */
+export const bulkCreateUsers = asyncHandler(async (req, res) => {
+  if (!req.file) throw new ApiError(400, 'No file uploaded (field name: "file")');
+  const { parseUserCsv } = await import('../services/csv.service.js');
+  const { valid, invalid, totalRows, defaultPassword } = parseUserCsv(req.file.buffer);
+
+  const created = [];
+  const skipped = [...invalid.map((i) => ({ email: i.email, reason: i.errors.join(', ') }))];
+
+  for (const row of valid) {
+    const exists = await User.findOne({ email: row.email });
+    if (exists) {
+      skipped.push({ email: row.email, reason: 'Already exists' });
+      continue;
+    }
+    const user = new User({
+      organizationId: req.organizationId,
+      name: row.name,
+      email: row.email,
+      role: row.role,
+    });
+    await user.setPassword(row.password);
+    await user.save();
+    created.push(user.toSafeJSON());
+  }
+
+  res.status(201).json({
+    created: created.length,
+    skipped: skipped.length,
+    skippedDetails: skipped.slice(0, 50),
+    totalRows,
+    defaultPassword,
+  });
+});
+
 // Count active admins in the org — used to stop the last one being removed/demoted.
 async function activeAdminCount(organizationId, excludeId) {
   const filter = { organizationId, role: 'admin', isActive: true };

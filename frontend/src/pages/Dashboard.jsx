@@ -43,8 +43,15 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
 
+  // Load now, then auto-refresh every 15s and whenever the tab regains focus.
   useEffect(() => {
-    api.get('/dashboard/summary').then(setData).catch(() => {});
+    let alive = true;
+    const fetchSummary = () => api.get('/dashboard/summary').then((d) => { if (alive) setData(d); }).catch(() => {});
+    fetchSummary();
+    const id = setInterval(fetchSummary, 15000);
+    const onFocus = () => fetchSummary();
+    window.addEventListener('focus', onFocus);
+    return () => { alive = false; clearInterval(id); window.removeEventListener('focus', onFocus); };
   }, []);
 
   if (!data) return <div style={{ padding: 40 }}><Spinner /></div>;
@@ -58,7 +65,12 @@ export default function Dashboard() {
       <div className="page-head">
         <div>
           <h1>{greet}, {user?.name?.split(' ')[0]}</h1>
-          <div className="desc">Here's your outreach activity for today.</div>
+          <div className="desc" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            Here's your outreach activity for today.
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--good)', fontSize: 12, fontWeight: 600 }}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--good)' }} />Live
+            </span>
+          </div>
         </div>
         <button className="btn" onClick={() => navigate('/campaigns')}><Icon.Plus />New campaign</button>
       </div>

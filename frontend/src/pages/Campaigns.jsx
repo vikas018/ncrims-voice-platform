@@ -259,7 +259,7 @@ export default function Campaigns() {
             </button>
             <div className="mini-note" style={{ marginLeft: 'auto' }}>
               <Icon.Info />
-              <span>Unanswered/busy calls cost 0 minutes. Connected calls bill a 60-second minimum pulse.</span>
+              <span>Unanswered/busy calls cost 0 minutes. Connected calls bill a 1-minute minimum, then by actual duration.</span>
             </div>
           </div>
         </div>

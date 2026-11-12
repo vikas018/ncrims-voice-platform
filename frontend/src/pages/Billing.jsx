@@ -4,6 +4,7 @@ import { api } from '../api/client.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Badge, Icon, Toast } from '../components/ui.jsx';
 import AddPackageModal from '../components/AddPackageModal.jsx';
+import PlansModal from '../components/PlansModal.jsx';
 import { fmtInt, fmtDateTime } from '../utils/format.js';
 
 const fmtMoney = (n) =>
@@ -16,6 +17,7 @@ export default function Billing() {
   const [txns, setTxns] = useState([]);
   const [toast, setToast] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [showPlans, setShowPlans] = useState(false);
 
   const load = () => {
     api.get('/wallet').then(setBalance).catch(() => {});
@@ -39,7 +41,10 @@ export default function Billing() {
     <>
       <div className="page-head">
         <div><h1>Billing &amp; Minutes</h1><div className="desc">Prepaid connected-minute wallet, usage, and transaction ledger.</div></div>
-        {user?.role === 'admin' && <button className="btn" onClick={() => setShowAdd(true)}><Icon.Plus />Add minute package</button>}
+        <div className="pill-row">
+          <button className="btn ghost" onClick={() => setShowPlans(true)}>Compare plans</button>
+          {user?.role === 'admin' && <button className="btn" onClick={() => setShowAdd(true)}><Icon.Plus />Add minute package</button>}
+        </div>
       </div>
 
       <div className="card" style={{ padding: 22, marginBottom: 18 }}>
@@ -64,7 +69,7 @@ export default function Billing() {
         <div className="hint" style={{ display: 'flex', justifyContent: 'space-between' }}><span>{pct}% remaining</span></div>
         <div className="mini-note" style={{ marginTop: 16 }}>
           <Icon.Info />
-          <span><b>Pulse billing:</b> connected calls bill a 60-second minimum (a 15s call = 1 min). Unanswered, busy &amp; failed calls cost 0 minutes.</span>
+          <span><b>Pulse billing:</b> connected calls bill a 1-minute minimum, then by actual connected duration. Unanswered, busy &amp; failed calls cost 0 minutes. 18% GST applies on packages.</span>
         </div>
       </div>
 
@@ -100,6 +105,7 @@ export default function Billing() {
       </div>
 
       {showAdd && <AddPackageModal balance={balance} onClose={() => setShowAdd(false)} onAdded={onPackageAdded} />}
+      {showPlans && <PlansModal onClose={() => setShowPlans(false)} />}
       <Toast {...(toast || {})} onDone={() => setToast(null)} />
     </>
   );
